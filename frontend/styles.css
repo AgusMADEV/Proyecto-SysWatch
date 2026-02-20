@@ -1,0 +1,606 @@
+/* ═══════════════════════════════════════════════════════════════
+   SysWatch - Monitor de Recursos del Servidor
+   frontend/styles.css
+   
+   Tema oscuro profesional al estilo Grafana / htop.
+   Incluye:
+     - Variables CSS para un cambio de tema sencillo
+     - Diseño responsive en grid
+     - Barras de progreso con semáforo de colores
+     - Tarjetas de métricas
+     - Tabla de procesos
+     - Lista de alertas
+     - Toast de notificaciones
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ──────────────────────────────────────────────────
+   Variables (tema oscuro por defecto)
+   ──────────────────────────────────────────────── */
+:root {
+  --bg-base:       #0a0e1a;
+  --bg-surface:    #0f172a;
+  --bg-card:       #1e293b;
+  --bg-card-hover: #263245;
+  --border:        #334155;
+
+  --text-primary:   #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted:     #475569;
+
+  --verde:     #4ade80;
+  --amarillo:  #fbbf24;
+  --rojo:      #f87171;
+  --azul:      #60a5fa;
+  --violeta:   #c084fc;
+  --naranja:   #f97316;
+
+  --shadow: 0 4px 24px rgba(0,0,0,0.5);
+  --radius: 12px;
+  --radius-sm: 8px;
+  --transition: 0.2s ease;
+}
+
+/* Tema claro */
+body.tema-claro {
+  --bg-base:       #f1f5f9;
+  --bg-surface:    #e2e8f0;
+  --bg-card:       #ffffff;
+  --bg-card-hover: #f8fafc;
+  --border:        #cbd5e1;
+
+  --text-primary:   #0f172a;
+  --text-secondary: #475569;
+  --text-muted:     #94a3b8;
+}
+
+/* ──────────────────────────────────────────────────
+   Reset y base
+   ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", "Fira Mono", "Cascadia Code", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+  transition: background var(--transition), color var(--transition);
+}
+
+a { color: var(--azul); text-decoration: none; }
+
+/* ──────────────────────────────────────────────────
+   Scrollbar
+   ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ──────────────────────────────────────────────────
+   Header / Navbar
+   ──────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-logo h1 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--verde);
+}
+
+.header-logo .tagline {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ──────────────────────────────────────────────────
+   Estado WebSocket (punto parpadeante)
+   ──────────────────────────────────────────────── */
+.ws-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.ws-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--rojo);
+  flex-shrink: 0;
+}
+
+.ws-dot.conectado {
+  background: var(--verde);
+  box-shadow: 0 0 6px var(--verde);
+  animation: pulso 2s infinite;
+}
+
+@keyframes pulso {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+/* ──────────────────────────────────────────────────
+   Botones
+   ──────────────────────────────────────────────── */
+.btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  transition: all var(--transition);
+}
+
+.btn:hover {
+  background: var(--bg-card-hover);
+  color: var(--text-primary);
+  border-color: var(--azul);
+}
+
+.btn-ventana.activo {
+  background: var(--azul);
+  color: #0f172a;
+  border-color: var(--azul);
+  font-weight: 700;
+}
+
+.btn-verde  { border-color: var(--verde); color: var(--verde); }
+.btn-verde:hover { background: var(--verde); color: #0f172a; }
+
+/* ──────────────────────────────────────────────────
+   Layout principal
+   ──────────────────────────────────────────────── */
+.main-container {
+  padding: 20px 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* ──────────────────────────────────────────────────
+   Sección título
+   ──────────────────────────────────────────────── */
+.seccion-titulo {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.seccion-titulo::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ──────────────────────────────────────────────────
+   Grid de tarjetas métricas
+   ──────────────────────────────────────────────── */
+.grid-metricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.tarjeta {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.tarjeta:hover {
+  border-color: var(--azul);
+  box-shadow: var(--shadow);
+}
+
+.tarjeta-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.tarjeta-titulo {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+
+.tarjeta-icono {
+  font-size: 1.4rem;
+  opacity: 0.7;
+}
+
+.valor-principal {
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 4px;
+  color: var(--verde);
+  transition: color var(--transition);
+}
+
+.valor-secundario {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+
+.detalles-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.detalle-item span:first-child { color: var(--text-muted); }
+.detalle-item span:last-child  { color: var(--text-primary); font-weight: 600; }
+
+/* ──────────────────────────────────────────────────
+   Barras de progreso
+   ──────────────────────────────────────────────── */
+.barra-wrap {
+  height: 6px;
+  background: var(--bg-base);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.barra-progreso {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease, background-color 0.3s;
+  width: 0%;
+}
+
+.barra-progreso.verde   { background: var(--verde); box-shadow: 0 0 6px var(--verde)30; }
+.barra-progreso.amarillo{ background: var(--amarillo); box-shadow: 0 0 6px var(--amarillo)30; }
+.barra-progreso.rojo    { background: var(--rojo); box-shadow: 0 0 8px var(--rojo)50; animation: parpadeo-rojo 1s infinite; }
+
+@keyframes parpadeo-rojo {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+/* ──────────────────────────────────────────────────
+   Grid de núcleos CPU
+   ──────────────────────────────────────────────── */
+.nucleos-titulo {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+#nucleos-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nucleo-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-size: 0.65rem;
+}
+
+.nucleo-label { color: var(--text-muted); min-width: 16px; }
+.nucleo-val   { color: var(--text-primary); min-width: 32px; text-align: right; }
+.nucleo-bar-wrap {
+  width: 40px;
+  height: 5px;
+  background: var(--bg-surface);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+/* ──────────────────────────────────────────────────
+   Gráficas
+   ──────────────────────────────────────────────── */
+.grid-graficas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 16px;
+}
+
+.grafica-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  transition: border-color var(--transition);
+}
+
+.grafica-card:hover { border-color: var(--azul); }
+
+.grafica-titulo {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.grafica-contenedor {
+  height: 180px;
+  position: relative;
+}
+
+/* ──────────────────────────────────────────────────
+   Panel histórico (ventana selector + gráficas)
+   ──────────────────────────────────────────────── */
+.historico-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.ventana-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ──────────────────────────────────────────────────
+   Estadísticas resumen (Web Worker)
+   ──────────────────────────────────────────────── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--azul);
+}
+
+/* ──────────────────────────────────────────────────
+   Tabla de procesos
+   ──────────────────────────────────────────────── */
+.tabla-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+th {
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 7px 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--bg-base);
+}
+
+tr:hover td { background: var(--bg-surface); }
+tr:last-child td { border-bottom: none; }
+
+.proc-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+/* ──────────────────────────────────────────────────
+   Panel de alertas
+   ──────────────────────────────────────────────── */
+.alertas-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.alertas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.alertas-badge {
+  background: var(--rojo);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.alerta-item {
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border-left: 3px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.alerta-item.advertencia { border-left-color: var(--amarillo); }
+.alerta-item.critica     { border-left-color: var(--rojo); background: #1c1212; }
+
+.alerta-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.alerta-metrica {
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.alerta-ts {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.alerta-mensaje {
+  font-size: 0.78rem;
+  color: var(--amarillo);
+}
+
+.alerta-item.critica .alerta-mensaje { color: var(--rojo); }
+
+.alerta-detalle {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.alerta-vacia {
+  text-align: center;
+  color: var(--verde);
+  padding: 20px;
+  font-size: 0.8rem;
+}
+
+/* ──────────────────────────────────────────────────
+   Toast de notificaciones
+   ──────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  max-width: 320px;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-info   { border-color: var(--azul);     color: var(--azul); }
+.toast-warn   { border-color: var(--amarillo);  color: var(--amarillo); }
+.toast-error  { border-color: var(--rojo);      color: var(--rojo); background: #1c1212; }
+
+/* ──────────────────────────────────────────────────
+   Footer
+   ──────────────────────────────────────────────── */
+.footer {
+  text-align: center;
+  padding: 16px;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+
+/* ──────────────────────────────────────────────────
+   Responsive
+   ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .header     { padding: 10px 14px; }
+  .main-container { padding: 12px 14px; }
+  .grid-graficas  { grid-template-columns: 1fr; }
+  .grid-metricas  { grid-template-columns: 1fr 1fr; }
+  .valor-principal { font-size: 1.7rem; }
+}
+
+@media (max-width: 480px) {
+  .grid-metricas { grid-template-columns: 1fr; }
+  .stats-grid    { grid-template-columns: 1fr 1fr; }
+}
