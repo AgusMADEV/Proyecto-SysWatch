@@ -291,7 +291,7 @@ function actualizarTarjetas(m) {
   setVal("val-cpu-nucleos",  m.cpu?.nucleos ?? "--");
   setVal("val-cpu-freq",     m.cpu?.frecuencia_mhz ?? "--", " MHz");
   setBar("bar-cpu",          m.cpu?.global ?? 0);
-  colorearBarra("bar-cpu",   m.cpu?.global ?? 0);
+  colorearBarra("bar-cpu",   m.cpu?.global ?? 0, "green");
   renderizarNucleos(m.cpu?.por_nucleo ?? []);
 
   // Memoria
@@ -299,7 +299,7 @@ function actualizarTarjetas(m) {
   setVal("val-mem-usado",  m.memoria?.usado_mb   ?? 0, " MB");
   setVal("val-mem-total",  m.memoria?.total_mb   ?? 0, " MB");
   setBar("bar-mem",        m.memoria?.porcentaje ?? 0);
-  colorearBarra("bar-mem", m.memoria?.porcentaje ?? 0);
+  colorearBarra("bar-mem", m.memoria?.porcentaje ?? 0, "blue");
 
   setVal("val-swap-pct",   m.memoria?.swap_pct     ?? 0, "%");
   setVal("val-swap-usado", m.memoria?.swap_usado_mb ?? 0, " MB");
@@ -310,7 +310,21 @@ function actualizarTarjetas(m) {
   setVal("val-disco-esc",    m.disco?.escritura_mbs ?? 0, " MB/s");
   setVal("val-disco-libre",  m.disco?.libre_gb      ?? 0, " GB");
   setBar("bar-disco",        m.disco?.porcentaje    ?? 0);
-  colorearBarra("bar-disco", m.disco?.porcentaje    ?? 0);
+  colorearBarra("bar-disco", m.disco?.porcentaje    ?? 0, "orange");
+
+  // Gauges SVG
+  if (typeof setGauge === "function") {
+    setGauge("gauge-cpu",   m.cpu?.global         ?? 0);
+    setGauge("gauge-mem",   m.memoria?.porcentaje  ?? 0);
+    setGauge("gauge-disco", m.disco?.porcentaje    ?? 0);
+  }
+  // Tags de estado
+  if (typeof setTag === "function") {
+    setTag("tag-cpu",   m.cpu?.global         ?? 0);
+    setTag("tag-mem",   m.memoria?.porcentaje  ?? 0);
+    setTag("tag-disco", m.disco?.porcentaje    ?? 0);
+    setTag("tag-red",   0); // red no tiene umbral porcentual
+  }
 
   // Red
   setVal("val-red-env",   m.red?.enviado_kbs  ?? 0, " KB/s");
@@ -318,11 +332,15 @@ function actualizarTarjetas(m) {
   setVal("val-red-pkt-e", m.red?.paquetes_enviados  ?? 0);
   setVal("val-red-pkt-r", m.red?.paquetes_recibidos ?? 0);
 
-  // Timestamp
-  setVal("val-timestamp", m.timestamp ? m.timestamp.replace("T", " ") : "--");
+  // Timestamp (ignorado en la nueva UI — no hay elemento)
+  // setVal("val-timestamp", ...);
 
   // Procesos top
-  renderizarProcesos(m.procesos ?? []);
+  if (typeof renderizarProcesosPanel === "function") {
+    renderizarProcesosPanel(m.procesos ?? []);
+  } else {
+    renderizarProcesos(m.procesos ?? []);
+  }
 }
 
 function setVal(id, val, sufijo = "") {
@@ -337,25 +355,27 @@ function setBar(id, pct) {
   el.style.width = `${Math.min(100, Math.max(0, pct))}%`;
 }
 
-function colorearBarra(id, pct) {
+function colorearBarra(id, pct, colorBase = "green") {
   const el = document.getElementById(id);
   if (!el) return;
-  el.className = "barra-progreso " +
-    (pct < 60 ? "verde" : pct < 85 ? "amarillo" : "rojo");
+  // En la nueva UI, la barra cambia a naranja/rojo según umbral
+  const color = pct >= 85 ? "red" : pct >= 60 ? "orange" : colorBase;
+  el.className = "kpi-bar " + color;
 }
 
 function renderizarNucleos(nucleos) {
   const contenedor = document.getElementById("nucleos-grid");
   if (!contenedor) return;
-  contenedor.innerHTML = nucleos.map((pct, i) => `
-    <div class="nucleo-chip">
-      <span class="nucleo-label">C${i}</span>
-      <div class="nucleo-bar-wrap">
-        <div class="barra-progreso ${pct < 60 ? "verde" : pct < 85 ? "amarillo" : "rojo"}"
-             style="width:${pct}%;height:100%"></div>
+  contenedor.innerHTML = nucleos.map((pct, i) => {
+    const color = pct >= 85 ? "#f87171" : pct >= 60 ? "#fb923c" : "#22d3a0";
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:3px;min-width:44px">
+      <span style="font-size:.65rem;color:var(--text-muted);font-family:monospace">C${i}</span>
+      <div style="width:36px;height:5px;background:var(--border);border-radius:99px;overflow:hidden">
+        <div style="height:100%;width:${Math.min(pct,100)}%;background:${color};border-radius:99px;transition:width .4s"></div>
       </div>
-      <span class="nucleo-val">${pct}%</span>
-    </div>`).join("");
+      <span style="font-size:.7rem;font-weight:600;font-family:monospace;color:${color}">${pct}%</span>
+    </div>`;
+  }).join("");
 }
 
 function renderizarProcesos(procs) {
@@ -403,22 +423,31 @@ function renderizarListaAlertas(alertas) {
   const lista = document.getElementById("alertas-lista");
   if (!lista) return;
 
+  // Actualizar contadores (panel + sidebar badge)
+  const criticas = alertas.filter(a => a.severidad === "critica").length;
+  const warns    = alertas.length - criticas;
+  if (typeof window._actualizarBadgeAlertas === "function") {
+    window._actualizarBadgeAlertas(criticas, warns);
+  }
   const contadorEl = document.getElementById("alertas-count");
-  if (contadorEl) contadorEl.textContent = alertas.length;
+  if (contadorEl) {
+    contadorEl.textContent = alertas.length;
+    contadorEl.style.display = alertas.length > 0 ? "" : "none";
+  }
 
   if (alertas.length === 0) {
-    lista.innerHTML = `<div class="alerta-vacia">✅ Sin alertas recientes</div>`;
+    lista.innerHTML = `<div class="empty-state">✅ Sin alertas recientes</div>`;
     return;
   }
 
   lista.innerHTML = alertas.map(a => `
-    <div class="alerta-item ${a.severidad}">
-      <div class="alerta-header">
-        <span class="alerta-metrica">${a.metrica}</span>
-        <span class="alerta-ts">${a.timestamp}</span>
+    <div class="alerta-item ${a.severidad === "critica" ? "critica" : "warn"}">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-weight:600;font-size:.8rem">${a.metrica ?? ""}</span>
+        <span class="mono muted" style="font-size:.72rem">${(a.timestamp ?? "").replace("T"," ")}</span>
       </div>
-      <div class="alerta-mensaje">${a.mensaje}</div>
-      <div class="alerta-detalle">Umbral: ${a.umbral}% · Valor: ${a.valor}%</div>
+      <div style="font-size:.82rem">${a.mensaje}</div>
+      <div class="muted" style="font-size:.72rem;margin-top:3px">Umbral: ${a.umbral ?? "?"}% · Valor: ${a.valor ?? "?"}%</div>
     </div>`).join("");
 }
 
@@ -442,7 +471,7 @@ function mostrarToast(msg, tipo = "info") {
   const el = document.getElementById("toast");
   if (!el) return;
   el.textContent  = msg;
-  el.className    = `toast visible toast-${tipo}`;
+  el.className    = `toast show ${tipo}`;
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => { el.className = "toast"; }, 4000);
 }
@@ -487,7 +516,8 @@ function toggleTema() {
 
 function cambiarVentana(ventana) {
   estado.ventana = ventana;
-  document.querySelectorAll(".btn-ventana").forEach(b => {
+  // Nuevo selector: pills en panel histórico
+  document.querySelectorAll(".pill[data-ventana]").forEach(b => {
     b.classList.toggle("activo", b.dataset.ventana === ventana);
   });
   socket?.emit("solicitar_historico", { ventana });
@@ -507,16 +537,15 @@ document.addEventListener("DOMContentLoaded", () => {
   // WebSocket
   conectarWebSocket();
 
-  // Botones de ventana temporal
-  document.querySelectorAll(".btn-ventana").forEach(btn => {
+  // Pills de ventana temporal (panel histórico)
+  document.querySelectorAll(".pill[data-ventana]").forEach(btn => {
     btn.addEventListener("click", () => cambiarVentana(btn.dataset.ventana));
   });
 
-  // Botón exportar CSV
-  document.getElementById("btn-exportar")?.addEventListener("click", exportarCSV);
+  // Botón exportar CSV (topbar)
+  document.getElementById("btn-export-csv")?.addEventListener("click", exportarCSV);
 
-  // Botón tema
-  document.getElementById("btn-tema")?.addEventListener("click", toggleTema);
+  // El botón de tema está en el topbar y manejado en index.html inline
 
   // Estado inicial de conexión
   actualizarEstadoConexion(false);

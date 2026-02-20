@@ -3,296 +3,481 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SysWatch — Panel de Control</title>
-
-  <!-- Google Fonts -->
+  <title>SysWatch — Monitor de Sistema</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <!-- Socket.IO -->
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════
-     HEADER / NAVBAR
-     ═══════════════════════════════════════════════ -->
-<header class="header">
-  <div class="header-logo">
+<!-- ── FONDO DECORATIVO ──────────────────────────────── -->
+<div class="bg-grid"></div>
+<div class="bg-glow bg-glow-1"></div>
+<div class="bg-glow bg-glow-2"></div>
+<div class="bg-glow bg-glow-3"></div>
+
+<!-- ══════════════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">⬡</div>
     <div>
-      <h1>⚡ SysWatch</h1>
-      <div class="tagline">Monitor de Recursos del Servidor · DAM-2</div>
+      <div class="logo-name">SysWatch</div>
+      <div class="logo-ver">v1.0</div>
     </div>
   </div>
 
-  <div class="header-controls">
-    <!-- Estado de la conexión WebSocket -->
-    <div class="ws-status">
-      <div class="ws-dot desconectado" id="ws-dot"></div>
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">MONITORIZACIÓN</div>
+
+    <a class="nav-item active" href="#" data-panel="panel-realtime">
+      <span>▶</span> Tiempo Real
+    </a>
+    <a class="nav-item" href="#" data-panel="panel-historico">
+      <span>⌛</span> Histórico
+    </a>
+    <a class="nav-item" href="#" data-panel="panel-procesos">
+      <span>⚙</span> Procesos
+    </a>
+
+    <div class="nav-group-label" style="margin-top:16px">SISTEMA</div>
+
+    <a class="nav-item" href="#" data-panel="panel-alertas">
+      <span>🔔</span> Alertas
+      <span class="nav-badge" id="nav-badge-alertas" style="display:none">0</span>
+    </a>
+    <a class="nav-item" href="#" data-panel="panel-estado">
+      <span>🗄</span> Base de Datos
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="ws-pill" id="ws-pill">
+      <span class="ws-dot" id="ws-dot"></span>
       <span id="ws-estado">Desconectado</span>
     </div>
-
-    <!-- Última actualización -->
-    <span style="font-size:0.7rem;color:var(--text-muted);">
-      🕐 <span id="val-timestamp">--</span>
-    </span>
-
-    <!-- Botones de acción -->
-    <button class="btn btn-verde" id="btn-exportar" title="Exportar histórico a CSV">
-      📥 Exportar CSV
-    </button>
-    <button class="btn" id="btn-tema">☀️ Claro</button>
   </div>
-</header>
+</aside>
 
-<!-- ═══════════════════════════════════════════════
-     CONTENIDO PRINCIPAL
-     ═══════════════════════════════════════════════ -->
-<main class="main-container">
+<!-- ══════════════════════════════════════════════════════
+     LAYOUT PRINCIPAL
+══════════════════════════════════════════════════════ -->
+<div class="layout" id="layout">
 
-  <!-- ── 1. MÉTRICAS EN TIEMPO REAL ─────────────── -->
-  <section>
-    <div class="seccion-titulo">📡 Métricas en Tiempo Real</div>
-
-    <div class="grid-metricas">
-
-      <!-- ── Tarjeta CPU ── -->
-      <div class="tarjeta">
-        <div class="tarjeta-header">
-          <span class="tarjeta-titulo">CPU Global</span>
-          <span class="tarjeta-icono">🖥️</span>
-        </div>
-        <div class="valor-principal" id="val-cpu-global">—</div>
-        <div class="valor-secundario">
-          <span id="val-cpu-nucleos">—</span> núcleos ·
-          <span id="val-cpu-freq">—</span>
-        </div>
-        <div class="barra-wrap">
-          <div class="barra-progreso verde" id="bar-cpu" style="width:0%"></div>
-        </div>
-
-        <!-- Mini-grid de núcleos -->
-        <div class="nucleos-titulo">Uso por Núcleo</div>
-        <div id="nucleos-grid">
-          <span style="color:var(--text-muted);font-size:0.7rem;">Esperando datos…</span>
-        </div>
-      </div>
-
-      <!-- ── Tarjeta Memoria ── -->
-      <div class="tarjeta">
-        <div class="tarjeta-header">
-          <span class="tarjeta-titulo">Memoria RAM</span>
-          <span class="tarjeta-icono">💾</span>
-        </div>
-        <div class="valor-principal" id="val-mem-pct">—</div>
-        <div class="valor-secundario">
-          <span id="val-mem-usado">—</span> MB usados / <span id="val-mem-total">—</span> MB total
-        </div>
-        <div class="barra-wrap">
-          <div class="barra-progreso verde" id="bar-mem" style="width:0%"></div>
-        </div>
-        <div class="detalles-grid">
-          <div class="detalle-item">
-            <span>Swap usado</span><br><span id="val-swap-usado">—</span> MB
-          </div>
-          <div class="detalle-item">
-            <span>Swap %</span><br><span id="val-swap-pct">—</span>%
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Tarjeta Disco ── -->
-      <div class="tarjeta">
-        <div class="tarjeta-header">
-          <span class="tarjeta-titulo">Disco</span>
-          <span class="tarjeta-icono">💿</span>
-        </div>
-        <div class="valor-principal" id="val-disco-pct">—</div>
-        <div class="valor-secundario">
-          Libre: <span id="val-disco-libre">—</span>
-        </div>
-        <div class="barra-wrap">
-          <div class="barra-progreso verde" id="bar-disco" style="width:0%"></div>
-        </div>
-        <div class="detalles-grid">
-          <div class="detalle-item">
-            <span>Lectura</span><br><span id="val-disco-lec">—</span>
-          </div>
-          <div class="detalle-item">
-            <span>Escritura</span><br><span id="val-disco-esc">—</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Tarjeta Red ── -->
-      <div class="tarjeta">
-        <div class="tarjeta-header">
-          <span class="tarjeta-titulo">Red</span>
-          <span class="tarjeta-icono">🌐</span>
-        </div>
-        <div class="valor-principal" style="color:var(--violeta)" id="val-red-env">—</div>
-        <div class="valor-secundario">
-          ↑ Enviado · ↓ <span id="val-red-rec">—</span>
-        </div>
-        <div class="detalles-grid">
-          <div class="detalle-item">
-            <span>Pkts enviados</span><br><span id="val-red-pkt-e">—</span>
-          </div>
-          <div class="detalle-item">
-            <span>Pkts recibidos</span><br><span id="val-red-pkt-r">—</span>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /grid-metricas -->
-  </section>
-
-  <!-- ── 2. GRÁFICAS EN TIEMPO REAL ─────────────── -->
-  <section>
-    <div class="seccion-titulo">📈 Gráficas en Tiempo Real</div>
-    <div class="grid-graficas">
-      <div class="grafica-card">
-        <div class="grafica-titulo">CPU % (últimas muestras)</div>
-        <div class="grafica-contenedor"><canvas id="chart-cpu-rt"></canvas></div>
-      </div>
-      <div class="grafica-card">
-        <div class="grafica-titulo">RAM % (últimas muestras)</div>
-        <div class="grafica-contenedor"><canvas id="chart-mem-rt"></canvas></div>
-      </div>
-      <div class="grafica-card">
-        <div class="grafica-titulo">Disco I/O (MB/s)</div>
-        <div class="grafica-contenedor"><canvas id="chart-disco-rt"></canvas></div>
-      </div>
-      <div class="grafica-card">
-        <div class="grafica-titulo">Red (KB/s)</div>
-        <div class="grafica-contenedor"><canvas id="chart-red-rt"></canvas></div>
-      </div>
+  <!-- ── TOPBAR ─────────────────────────────────── -->
+  <header class="topbar">
+    <button class="topbar-toggle" id="topbar-toggle" title="Colapsar sidebar">☰</button>
+    <div class="topbar-breadcrumb">
+      <span class="muted">SysWatch</span>
+      <span class="muted"> / </span>
+      <span id="breadcrumb-panel">Tiempo Real</span>
     </div>
-  </section>
+    <div class="topbar-spacer"></div>
+    <div class="topbar-clock mono" id="reloj-topbar">--:--:--</div>
+    <button class="topbar-btn" id="btn-export-csv" title="Exportar CSV">↓ CSV</button>
+    <button class="topbar-btn icon-only" id="btn-toggle-tema" title="Cambiar tema">◑</button>
+  </header>
 
-  <!-- ── 3. HISTÓRICO ────────────────────────────── -->
-  <section>
-    <div class="historico-header">
-      <div class="seccion-titulo" style="margin-bottom:0">🗃️ Histórico</div>
-      <!-- Selector de ventana temporal -->
-      <div class="ventana-btns">
-        <button class="btn btn-ventana activo" data-ventana="1h">1h</button>
-        <button class="btn btn-ventana"        data-ventana="6h">6h</button>
-        <button class="btn btn-ventana"        data-ventana="24h">24h</button>
-        <button class="btn btn-ventana"        data-ventana="7d">7d</button>
-        <button class="btn btn-ventana"        data-ventana="30d">30d</button>
-      </div>
-    </div>
+  <!-- ══════════════════════════════════════════════
+       CONTENIDO — PANELES
+  ══════════════════════════════════════════════ -->
+  <main class="content">
 
-    <!-- Estadísticas resumen calculadas por el Web Worker -->
-    <div class="stats-grid">
-      <div class="stat-item">
-        <div class="stat-label">CPU Avg</div>
-        <div class="stat-value" id="stat-cpu-avg">—</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">CPU Máx</div>
-        <div class="stat-value" id="stat-cpu-max">—</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">CPU p95</div>
-        <div class="stat-value" id="stat-cpu-p95">—</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">RAM Avg</div>
-        <div class="stat-value" id="stat-mem-avg">—</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">RAM Máx</div>
-        <div class="stat-value" id="stat-mem-max">—</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">RAM p95</div>
-        <div class="stat-value" id="stat-mem-p95">—</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-label">Muestras</div>
-        <div class="stat-value" id="stat-muestras">—</div>
-      </div>
-    </div>
+    <!-- ─────────────────────────────────────────────
+         PANEL 1 · TIEMPO REAL
+    ───────────────────────────────────────────── -->
+    <section class="panel active" id="panel-realtime">
 
-    <div class="grid-graficas">
-      <div class="grafica-card">
-        <div class="grafica-titulo">CPU % histórico</div>
-        <div class="grafica-contenedor"><canvas id="chart-hist-cpu"></canvas></div>
-      </div>
-      <div class="grafica-card">
-        <div class="grafica-titulo">RAM % histórico</div>
-        <div class="grafica-contenedor"><canvas id="chart-hist-mem"></canvas></div>
-      </div>
-      <div class="grafica-card">
-        <div class="grafica-titulo">Disco % histórico</div>
-        <div class="grafica-contenedor"><canvas id="chart-hist-disco"></canvas></div>
-      </div>
-      <div class="grafica-card">
-        <div class="grafica-titulo">Red KB/s histórico</div>
-        <div class="grafica-contenedor"><canvas id="chart-hist-red"></canvas></div>
-      </div>
-    </div>
-  </section>
+      <!-- KPI Row -->
+      <div class="kpi-row">
 
-  <!-- ── 4. FILA INFERIOR: Procesos + Alertas ─────── -->
-  <section>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap;">
+        <!-- KPI CPU -->
+        <div class="kpi-card kpi-green">
+          <div class="kpi-top">
+            <span class="kpi-label">CPU Global</span>
+            <span class="kpi-tag green" id="tag-cpu">OK</span>
+          </div>
+          <div class="kpi-gauge-area">
+            <svg class="kpi-gauge" viewBox="0 0 120 75">
+              <path class="gauge-bg" d="M15,65 A50,50 0 0,1 105,65"/>
+              <path class="gauge-arc gauge-arc-green" id="gauge-cpu" d="M15,65 A50,50 0 0,1 105,65" stroke-dasharray="0 157"/>
+            </svg>
+            <div class="kpi-center">
+              <div class="kpi-val" id="val-cpu-global">—</div>
+              <div class="kpi-unit">%</div>
+            </div>
+          </div>
+          <div class="kpi-foot">
+            <span class="mono muted" id="val-cpu-nucleos">—</span> núcleos ·
+            <span class="mono muted" id="val-cpu-freq">—</span>
+          </div>
+          <div class="kpi-bar-wrap">
+            <div class="kpi-bar green" id="bar-cpu" style="width:0%"></div>
+          </div>
+        </div>
 
-      <!-- Tabla de procesos top -->
-      <div>
-        <div class="seccion-titulo">⚙️ Top Procesos (CPU)</div>
-        <div class="tabla-card">
-          <table>
+        <!-- KPI RAM -->
+        <div class="kpi-card kpi-blue">
+          <div class="kpi-top">
+            <span class="kpi-label">Memoria RAM</span>
+            <span class="kpi-tag green" id="tag-mem">OK</span>
+          </div>
+          <div class="kpi-gauge-area">
+            <svg class="kpi-gauge" viewBox="0 0 120 75">
+              <path class="gauge-bg" d="M15,65 A50,50 0 0,1 105,65"/>
+              <path class="gauge-arc gauge-arc-blue" id="gauge-mem" d="M15,65 A50,50 0 0,1 105,65" stroke-dasharray="0 157"/>
+            </svg>
+            <div class="kpi-center">
+              <div class="kpi-val" id="val-mem-pct">—</div>
+              <div class="kpi-unit">%</div>
+            </div>
+          </div>
+          <div class="kpi-foot">
+            <span class="mono muted" id="val-mem-usado">—</span> /
+            <span class="mono muted" id="val-mem-total">—</span> MB
+          </div>
+          <div class="kpi-bar-wrap">
+            <div class="kpi-bar blue" id="bar-mem" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- KPI Disco -->
+        <div class="kpi-card kpi-orange">
+          <div class="kpi-top">
+            <span class="kpi-label">Disco</span>
+            <span class="kpi-tag green" id="tag-disco">OK</span>
+          </div>
+          <div class="kpi-gauge-area">
+            <svg class="kpi-gauge" viewBox="0 0 120 75">
+              <path class="gauge-bg" d="M15,65 A50,50 0 0,1 105,65"/>
+              <path class="gauge-arc gauge-arc-orange" id="gauge-disco" d="M15,65 A50,50 0 0,1 105,65" stroke-dasharray="0 157"/>
+            </svg>
+            <div class="kpi-center">
+              <div class="kpi-val" id="val-disco-pct">—</div>
+              <div class="kpi-unit">%</div>
+            </div>
+          </div>
+          <div class="kpi-foot">
+            <span class="mono muted" id="val-disco-lec">—</span> lec ·
+            <span class="mono muted" id="val-disco-esc">—</span> esc
+          </div>
+          <div class="kpi-bar-wrap">
+            <div class="kpi-bar orange" id="bar-disco" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- KPI Red -->
+        <div class="kpi-card kpi-violet">
+          <div class="kpi-top">
+            <span class="kpi-label">Red</span>
+            <span class="kpi-tag green" id="tag-red">OK</span>
+          </div>
+          <div class="net-split">
+            <div class="net-box">
+              <div class="net-arrow up">↑</div>
+              <div class="net-val mono" id="val-red-env">—</div>
+              <div class="net-unit">KB/s</div>
+            </div>
+            <div class="net-divider"></div>
+            <div class="net-box">
+              <div class="net-arrow down">↓</div>
+              <div class="net-val mono" id="val-red-rec">—</div>
+              <div class="net-unit">KB/s</div>
+            </div>
+          </div>
+          <div class="kpi-foot">
+            Pkts ↑ <span class="mono muted" id="val-red-pkt-e">—</span> ·
+            ↓ <span class="mono muted" id="val-red-pkt-r">—</span>
+          </div>
+        </div>
+
+      </div><!-- /kpi-row -->
+
+      <!-- Núcleos CPU -->
+      <div class="glass-card" style="margin-bottom:16px">
+        <div class="card-header">
+          <span class="card-title">Núcleos CPU</span>
+          <span class="card-badge"><span class="live-dot"></span> En vivo</span>
+        </div>
+        <div id="nucleos-grid" class="nucleos-grid">
+          <span class="muted" style="font-size:0.75rem">Esperando datos…</span>
+        </div>
+      </div>
+
+      <!-- Gráficas RT 2×2 -->
+      <div class="charts-2x2">
+        <div class="chart-card">
+          <div class="card-header"><span class="card-title">CPU % · Tiempo Real</span></div>
+          <div class="chart-wrap"><canvas id="chart-cpu-rt"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-header"><span class="card-title">RAM % · Tiempo Real</span></div>
+          <div class="chart-wrap"><canvas id="chart-mem-rt"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-header"><span class="card-title">Disco I/O MB/s</span></div>
+          <div class="chart-wrap"><canvas id="chart-disco-rt"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-header"><span class="card-title">Red KB/s</span></div>
+          <div class="chart-wrap"><canvas id="chart-red-rt"></canvas></div>
+        </div>
+      </div>
+
+    </section><!-- /panel-realtime -->
+
+    <!-- ─────────────────────────────────────────────
+         PANEL 2 · HISTÓRICO
+    ───────────────────────────────────────────── -->
+    <section class="panel" id="panel-historico">
+
+      <div class="hist-toolbar">
+        <span class="card-title">Histórico de Métricas</span>
+        <div class="pill-group">
+          <button class="pill activo" data-ventana="1h">1h</button>
+          <button class="pill" data-ventana="6h">6h</button>
+          <button class="pill" data-ventana="24h">24h</button>
+          <button class="pill" data-ventana="7d">7d</button>
+          <button class="pill" data-ventana="30d">30d</button>
+        </div>
+        <span class="hist-hint muted">Calculado por Web Worker</span>
+      </div>
+
+      <!-- Stats strip -->
+      <div class="stats-strip">
+        <div class="stat-chip accent"><span class="sc-label">CPU Avg</span><span class="sc-val mono" id="stat-cpu-avg">—</span></div>
+        <div class="stat-chip"><span class="sc-label">CPU Máx</span><span class="sc-val mono" id="stat-cpu-max">—</span></div>
+        <div class="stat-chip"><span class="sc-label">CPU p95</span><span class="sc-val mono" id="stat-cpu-p95">—</span></div>
+        <div class="stat-chip accent"><span class="sc-label">RAM Avg</span><span class="sc-val mono" id="stat-mem-avg">—</span></div>
+        <div class="stat-chip"><span class="sc-label">RAM Máx</span><span class="sc-val mono" id="stat-mem-max">—</span></div>
+        <div class="stat-chip"><span class="sc-label">RAM p95</span><span class="sc-val mono" id="stat-mem-p95">—</span></div>
+        <div class="stat-chip"><span class="sc-label">Muestras</span><span class="sc-val mono" id="stat-muestras">—</span></div>
+      </div>
+
+      <!-- Gráficas históricas 2×2 -->
+      <div class="charts-2x2">
+        <div class="chart-card">
+          <div class="card-header"><span class="card-title">CPU % histórico</span></div>
+          <div class="chart-wrap"><canvas id="chart-hist-cpu"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-header"><span class="card-title">RAM % histórico</span></div>
+          <div class="chart-wrap"><canvas id="chart-hist-mem"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-header"><span class="card-title">Disco % histórico</span></div>
+          <div class="chart-wrap"><canvas id="chart-hist-disco"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="card-header"><span class="card-title">Red KB/s histórico</span></div>
+          <div class="chart-wrap"><canvas id="chart-hist-red"></canvas></div>
+        </div>
+      </div>
+
+    </section><!-- /panel-historico -->
+
+    <!-- ─────────────────────────────────────────────
+         PANEL 3 · PROCESOS
+    ───────────────────────────────────────────── -->
+    <section class="panel" id="panel-procesos">
+      <div class="glass-card">
+        <div class="card-header">
+          <span class="card-title">Top Procesos por CPU</span>
+          <span class="card-badge"><span class="live-dot"></span> En vivo</span>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table">
             <thead>
               <tr>
                 <th>PID</th>
                 <th>Nombre</th>
                 <th>CPU %</th>
                 <th>RAM %</th>
+                <th>Actividad</th>
               </tr>
             </thead>
             <tbody id="procesos-tbody">
-              <tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Esperando datos…</td></tr>
+              <tr><td class="empty-cell" colspan="5">Esperando datos…</td></tr>
             </tbody>
           </table>
         </div>
       </div>
+    </section><!-- /panel-procesos -->
 
-      <!-- Panel de alertas -->
-      <div>
-        <div class="seccion-titulo">
-          🔔 Alertas
-          <span class="alertas-badge" id="alertas-count">0</span>
+    <!-- ─────────────────────────────────────────────
+         PANEL 4 · ALERTAS
+    ───────────────────────────────────────────── -->
+    <section class="panel" id="panel-alertas">
+      <div class="glass-card">
+        <div class="card-header">
+          <span class="card-title">Alertas del Sistema</span>
+          <span class="count-badge red" id="alertas-count" style="display:none">0</span>
         </div>
-        <div class="alertas-panel">
-          <div id="alertas-lista">
-            <div class="alerta-vacia">✅ Sin alertas recientes</div>
-          </div>
+        <div id="alertas-lista" class="alertas-lista">
+          <div class="empty-state">✅ Sin alertas recientes</div>
         </div>
       </div>
+    </section><!-- /panel-alertas -->
 
-    </div>
-  </section>
+    <!-- ─────────────────────────────────────────────
+         PANEL 5 · BASE DE DATOS
+    ───────────────────────────────────────────── -->
+    <section class="panel" id="panel-estado">
+      <div class="glass-card" style="max-width:680px">
+        <div class="card-header">
+          <span class="card-title">Estado de la Base de Datos</span>
+          <button class="topbar-btn" onclick="refrescarEstado()">↻ Refrescar</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+          <div class="stat-mini green">
+            <div class="sm-label">Registros RAW</div>
+            <div class="sm-val mono" id="bd-raw">—</div>
+          </div>
+          <div class="stat-mini blue">
+            <div class="sm-label">Registros por Hora</div>
+            <div class="sm-val mono" id="bd-horas">—</div>
+          </div>
+          <div class="stat-mini red">
+            <div class="sm-label">Alertas guardadas</div>
+            <div class="sm-val mono" id="bd-alertas">—</div>
+          </div>
+          <div class="stat-mini violet">
+            <div class="sm-label">Tamaño BD</div>
+            <div class="sm-val mono" id="bd-tam">—</div>
+          </div>
+        </div>
 
-</main>
+        <div class="mant-desc">
+          Mantenimiento: elimina registros con más de 30 días para liberar espacio.
+          La base de datos está en <span class="ic mono">syswatch.db</span>.
+        </div>
+        <div class="mant-btns">
+          <button class="action-btn danger" onclick="limpiarBD()">🗑️ Limpiar datos &gt;30 días</button>
+        </div>
+      </div>
+    </section><!-- /panel-estado -->
 
-<!-- ── TOAST ─────────────────────────────────────── -->
-<div class="toast" id="toast"></div>
+  </main><!-- /content -->
 
-<!-- ── FOOTER ────────────────────────────────────── -->
-<footer class="footer">
-  SysWatch v1.0 · DAM-2 · Programación de Servicios y Procesos ·
-  Backend: Python + Flask-SocketIO + SQLite · Frontend: HTML/JS + Chart.js + Web Workers
-</footer>
+  <!-- TOAST -->
+  <div class="toast" id="toast"></div>
 
-<!-- Lógica principal (cargado al final para que el DOM esté listo) -->
+</div><!-- /layout -->
+
+<script>
+// ── Reloj topbar ──────────────────────────────────────
+(function tickReloj() {
+  const el = document.getElementById('reloj-topbar');
+  if (el) el.textContent = new Date().toLocaleTimeString('es-ES');
+  setTimeout(tickReloj, 1000);
+})();
+
+// ── Sidebar toggle ────────────────────────────────────
+document.getElementById('topbar-toggle').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  document.getElementById('layout').classList.toggle('sb-collapsed');
+});
+
+// ── Navegación de paneles ─────────────────────────────
+const navItems = document.querySelectorAll('.nav-item[data-panel]');
+const panels   = document.querySelectorAll('.panel');
+const breadcrumb = document.getElementById('breadcrumb-panel');
+const labels = {
+  'panel-realtime':  'Tiempo Real',
+  'panel-historico': 'Histórico',
+  'panel-procesos':  'Procesos',
+  'panel-alertas':   'Alertas',
+  'panel-estado':    'Base de Datos'
+};
+
+navItems.forEach(item => {
+  item.addEventListener('click', e => {
+    e.preventDefault();
+    const target = item.dataset.panel;
+    navItems.forEach(n => n.classList.remove('active'));
+    panels.forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById(target)?.classList.add('active');
+    if (breadcrumb) breadcrumb.textContent = labels[target] || target;
+    if (target === 'panel-estado') refrescarEstado();
+  });
+});
+
+// ── Tema toggle ───────────────────────────────────────
+document.getElementById('btn-toggle-tema').addEventListener('click', () => {
+  const html = document.documentElement;
+  html.dataset.tema = html.dataset.tema === 'dark' ? 'light' : 'dark';
+});
+
+// ── Gauge helper ──────────────────────────────────────
+function setGauge(id, pct) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const arc = Math.min(pct / 100, 1) * 157;
+  el.setAttribute('stroke-dasharray', arc.toFixed(1) + ' 157');
+}
+
+// ── Tag helper ────────────────────────────────────────
+function setTag(id, pct) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = pct >= 85 ? 'CRÍTICO' : pct >= 60 ? 'ALERTA' : 'OK';
+  el.className = 'kpi-tag ' + (pct >= 85 ? 'red' : pct >= 60 ? 'yellow' : 'green');
+}
+
+// ── Badge alertas sidebar ─────────────────────────────
+window._actualizarBadgeAlertas = function(criticas, warns) {
+  const b = document.getElementById('nav-badge-alertas');
+  const ac = document.getElementById('alertas-count');
+  const total = criticas + warns;
+  if (b) { b.textContent = total; b.style.display = total > 0 ? '' : 'none'; }
+  if (ac) { ac.textContent = total; ac.style.display = total > 0 ? '' : 'none'; }
+};
+
+// ── Procesos panel ────────────────────────────────────
+function renderizarProcesosPanel(procs) {
+  const tbody = document.getElementById('procesos-tbody');
+  if (!tbody || !procs.length) return;
+  const maxCpu = Math.max(...procs.map(p => p.cpu_percent || 0), 1);
+  tbody.innerHTML = procs.map(p => {
+    const bar = ((p.cpu_percent || 0) / maxCpu * 100).toFixed(0);
+    const cls = p.cpu_percent > 50 ? 'red' : p.cpu_percent > 20 ? 'yellow' : 'green';
+    return `<tr>
+      <td class="mono muted">${p.pid ?? '--'}</td>
+      <td class="proc-name">${p.name ?? '--'}</td>
+      <td><span class="pct-badge ${cls}">${(p.cpu_percent ?? 0).toFixed(1)}%</span></td>
+      <td class="mono muted">${(p.memory_percent ?? 0).toFixed(1)}%</td>
+      <td><div class="act-bar-wrap"><div class="act-bar ${cls}" style="width:${bar}%"></div></div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Estado BD ─────────────────────────────────────────
+async function refrescarEstado() {
+  try {
+    const d = await fetch('/api/estado').then(r => r.json());
+    const b = d.base_datos || {};
+    document.getElementById('bd-raw').textContent     = (b.raw     ?? '—').toLocaleString('es-ES');
+    document.getElementById('bd-horas').textContent   = (b.horas   ?? '—').toLocaleString('es-ES');
+    document.getElementById('bd-alertas').textContent = (b.alertas ?? '—').toLocaleString('es-ES');
+    document.getElementById('bd-tam').textContent     = (b['tamaño_mb'] ?? '—') + ' MB';
+  } catch(e) { console.warn(e); }
+}
+
+async function limpiarBD() {
+  if (!confirm('¿Eliminar datos con más de 30 días?')) return;
+  try {
+    const d = await fetch('/api/mantenimiento/limpiar?dias=30').then(r => r.json());
+    mostrarToast('🗑️ ' + d.eliminados + ' filas eliminadas.', 'info');
+    refrescarEstado();
+  } catch(e) { mostrarToast('Error al limpiar BD', 'error'); }
+}
+</script>
+
 <script src="app.js"></script>
 </body>
 </html>
